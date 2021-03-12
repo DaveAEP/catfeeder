@@ -3,15 +3,19 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 
+const byte interruptPin = D7;
+
+void ICACHE_RAM_ATTR handleInterrupt();
+
 char ssid[] = "Sgt. Sam";        //  your network SSID (name)
 char pass[] = "koopjeeigenwifi";  // your network password
 
 int feedturns = 7; //amount of motor turns to feed cats
+int totalcounts = feedturns * 3400;
 
-int feedPin = D3;
-int feedDir = D1;
-int sensepin = A0;
-int senseval = 0;
+int feedPin = D6;
+int feedDir = D0;
+int counts = 0;
 
 int feedhour1 = 6;
 int feedminute1 = 15;
@@ -42,11 +46,11 @@ int Hour = 00;
 int Minute = 00;
 
 void setup() {
-
+  pinMode(interruptPin, INPUT_PULLUP);
   pinMode(feedPin, OUTPUT);
   pinMode(feedDir, OUTPUT);
   digitalWrite(feedPin, LOW);
-  digitalWrite(feedDir, LOW);
+  digitalWrite(feedDir, HIGH);
 
   // put your setup code here, to run once:
   Serial.begin(115200); //Start serial link to debug
@@ -73,6 +77,12 @@ void setup() {
   udp.begin(localPort);
   Serial.print("Local port: ");
   Serial.println(udp.localPort());
+
+  attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, RISING);
+}
+
+void ICACHE_RAM_ATTR handleInterrupt() {
+  counts++;
 }
 
 void loop() {
@@ -125,48 +135,24 @@ void loop() {
     Serial.print(':');
     Serial.println(epoch % 60); // print the second
   }
-  // wait 20 seconds before asking for the time again
-  delay(20000);
+  // wait 40 seconds before asking for the time again
+  delay(40000);
 
   if ((Hour == feedhour1 && Minute == feedminute1) || (Hour == feedhour2 && Minute == feedminute2) || (Hour == feedhour3 && Minute == feedminute3) || (Hour == feedhour4 && Minute == feedminute4) || (Hour == feedhour5 && Minute == feedminute5) || (Hour == feedhour6 && Minute == feedminute6)) {
 
-    int check = 0;
-    unsigned long ending = 0;
-    unsigned long start = millis();
-    digitalWrite(feedPin, HIGH);
-    digitalWrite(feedDir, HIGH);
-    Serial.println(senseval);
+    counts = 0;
+    delay(10);
+    Serial.println("Feeding!");
 
-    while (check < feedturns) {
-
-      senseval = analogRead(A0);
-      // Serial.println(senseval);
-      ending = millis();
-      delay(0);
-      if (senseval == 1000) {
-        check = check + 1;
-        Serial.println(check);
-        delay(10);
-        Serial.println((ending - start));
-      }
-
-
-
-      else if ((ending - start) > 10000) {
-        Serial.println("Blockage detected, reversing direction");
-        digitalWrite(feedDir, LOW);
-        delay(2000);
-        Serial.println("Should be clear now, rereversing feeding");
-        digitalWrite(feedDir, HIGH);
-        delay(2000);
-        start = millis();
-        timesfed = timesfed + 1;
-      }
-
+    while (counts < totalcounts) {
+      digitalWrite(feedPin, HIGH);
+      delay(10);
     }
+
+    Serial.println("Done!");
     digitalWrite(feedPin, LOW);
-    digitalWrite(feedDir, LOW);
     delay(100000);
+    counts = 0;
 
 
   }
